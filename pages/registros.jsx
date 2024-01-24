@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DefaultLayout from "@/layouts/default";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, useDisclosure } from "@nextui-org/react";
+import { Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from "@nextui-org/react";
+
+
 
 export default function RegistroRegion() {
   const [rucCi, setRucCi] = useState("");
@@ -10,6 +14,17 @@ export default function RegistroRegion() {
   const [precio, setPrecio] = useState("");
   const [totalItem, setTotalItem] = useState("");
   const [pedidos, setPedidos] = useState([]); // Lista de pedidos guardados
+  const [pedidosBD, setPedidosBD] = useState([]); // Lista de pedidos guardados
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
+
+  useEffect(() => {
+    fetch(`http://localhost:5000/pedidos`)
+      .then(res => res.json())
+      .then(data => {
+        setPedidosBD(data)
+      })
+  }, [])
+
 
   const handleCalcularTotalItem = () => {
     // Lógica para calcular el total del ítem
@@ -22,14 +37,42 @@ export default function RegistroRegion() {
     }
   };
 
-  const handleGuardarProducto = () => {
+
+  async function guardarPedido(nuevoProducto) {
+    const res = await fetch('http://localhost:5000/pedidos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(nuevoProducto),
+    })
+
+    const data = await res.json()
+
+    return data.id
+  }
+
+  async function deletePedido(id) {
+    const res = await fetch('http://localhost:5000/pedidos/' + id, {
+      method: 'DELETE'
+    })
+    console.log(res)
+    return res
+  }
+
+  const handleGuardarProducto = async () => {
     // Lógica para guardar el producto ingresado en los casilleros
     const nuevoProducto = {
+      id: 0,
       nombre: nombreProducto,
       cantidad: cantidad,
       precio: precio,
       totalItem: totalItem
     };
+
+    nuevoProducto.id = await guardarPedido(nuevoProducto);
+
+    console.log(nuevoProducto)
 
     // Agregar el nuevo producto a la lista de pedidos
     setPedidos([...pedidos, nuevoProducto]);
@@ -39,7 +82,17 @@ export default function RegistroRegion() {
     setCantidad("");
     setPrecio("");
     setTotalItem("");
+
+
   };
+
+
+  const handleEliminarPedidoWs = async (itemId) => {
+    await deletePedido(itemId);
+    const filtredData = pedidos.filter(item => item.id !== itemId);
+    setPedidos(filtredData);
+  };
+
 
   return (
     <DefaultLayout>
@@ -152,16 +205,64 @@ export default function RegistroRegion() {
         {/* Mostrar la lista de pedidos */}
         {pedidos.length > 0 && (
           <div>
-            <h2>Pedidos Guardados:</h2>
-            <ul>
-              {pedidos.map((pedido, index) => (
-                <li key={index}>{`Pedido ${index + 1}: ${JSON.stringify(
-                  pedido
-                )}`}</li>
-              ))}
-            </ul>
+            <Table removeWrapper aria-label="Example static collection table">
+                    <TableHeader>
+                      <TableColumn>Nombre</TableColumn>
+                      <TableColumn>Cantidad</TableColumn>
+                      <TableColumn>Precio</TableColumn>
+                      <TableColumn>Total</TableColumn>
+                      <TableColumn>Accion</TableColumn>
+                    </TableHeader>
+                    <TableBody>
+                      {pedidos.map((pedido, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{pedido.nombre}</TableCell>
+                            <TableCell>{pedido.cantidad}</TableCell>
+                            <TableCell>{pedido.precio}</TableCell>
+                            <TableCell>{pedido.totalItem}</TableCell>
+                            <TableCell><button className="boton-eliminar" onClick={() => handleEliminarPedidoWs(pedido.id)}>Eliminar</button></TableCell>
+                          </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
           </div>
         )}
+
+        <Button onPress={onOpen}>Ver Pedidos Previos</Button>
+        <Modal isOpen={isOpen} onOpenChange={onOpenChange} isDismissable={false} size="3xl" >
+          <ModalContent>
+            {(onClose) => (
+              <>
+                <ModalHeader className="flex flex-col gap-1">Pedidos almacenados</ModalHeader>
+                <ModalBody>
+                  <Table removeWrapper aria-label="Example static collection table">
+                    <TableHeader>
+                      <TableColumn>Nombre</TableColumn>
+                      <TableColumn>Cantidad</TableColumn>
+                      <TableColumn>Precio</TableColumn>
+                      <TableColumn>Total</TableColumn>
+                    </TableHeader>
+                    <TableBody>
+                      {pedidosBD.map((pedido, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{pedido.nombre}</TableCell>
+                            <TableCell>{pedido.cantidad}</TableCell>
+                            <TableCell>{pedido.precio}</TableCell>
+                            <TableCell>{pedido.totalItem}</TableCell>
+                          </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ModalBody>
+                <ModalFooter>
+                  <Button color="danger" variant="light" onPress={onClose}>
+                    Cerrar
+                  </Button>
+                </ModalFooter>
+              </>
+            )}
+          </ModalContent>
+        </Modal>
       </div>
 
       <style jsx>{`
@@ -203,11 +304,20 @@ export default function RegistroRegion() {
           color: #333;
           cursor: pointer;
         }
-
+        
         .boton-gris:hover,
         .boton-guardar:hover {
           background-color: #ddd;
         }
+
+        .boton-eliminar {
+          border: 1px solid #707070;
+          margin-top: 10px;
+          background-color: #f4f4f4;
+          color: #333;
+          cursor: pointer;
+        }
+
       `}</style>
     </DefaultLayout>
   );
